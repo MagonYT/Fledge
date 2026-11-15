@@ -1,0 +1,5 @@
+fledge_add_library(fledge_mcp)
+target_link_libraries(fledge_mcp PUBLIC fledge_core)
+if(WIN32)
+  target_link_libraries(fledge_mcp PRIVATE ws2_32)
+endif()

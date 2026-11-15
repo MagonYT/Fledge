@@ -1,0 +1,9 @@
+TODO: LICENSE NOT CHOSEN YET.
+
+The owner of this repository has not selected a license. Until one is chosen,
+all rights are reserved by the owner. Candidate options to consider: MIT,
+Apache-2.0, MPL-2.0, or a proprietary/source-available license.
+
+Third-party code fetched at build time is NOT covered by this file and keeps
+its own license: GLFW (zlib), Dear ImGui (MIT), nlohmann/json (MIT),
+stb (MIT / public domain), doctest (MIT).

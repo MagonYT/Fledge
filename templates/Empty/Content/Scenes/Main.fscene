@@ -1,0 +1,107 @@
+{
+  "format": "fscene",
+  "version": 2,
+  "name": "Main",
+  "entities": [
+    {
+      "id": 1,
+      "components": {
+        "Name": {
+          "name": "Main Camera"
+        },
+        "Transform": {
+          "position": [
+            0,
+            2.5,
+            7
+          ],
+          "rotation": [
+            -0.1305262,
+            0.0,
+            0.0,
+            0.9914449
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Camera": {
+          "fovDegrees": 60.0,
+          "nearPlane": 0.1,
+          "farPlane": 500.0,
+          "primary": true
+        }
+      }
+    },
+    {
+      "id": 2,
+      "components": {
+        "Name": {
+          "name": "Sun"
+        },
+        "Transform": {
+          "position": [
+            0,
+            20,
+            0
+          ],
+          "rotation": [
+            -0.1028474,
+            0.8962008,
+            0.3261904,
+            0.282571
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Light": {
+          "type": "Directional",
+          "color": [
+            1.0,
+            0.94,
+            0.85
+          ],
+          "intensity": 3.0,
+          "castShadows": true,
+          "shadowBias": 0.0006,
+          "normalBias": 1.5
+        }
+      }
+    },
+    {
+      "id": 3,
+      "components": {
+        "Name": {
+          "name": "Ground"
+        },
+        "Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            2,
+            1,
+            2
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:plane",
+          "material": "e0e00000000000000000000000000001"
+        }
+      }
+    }
+  ]
+}

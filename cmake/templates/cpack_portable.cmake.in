@@ -1,0 +1,11 @@
+# Generated: runs inside CPack after the install step (CPACK_PRE_BUILD_SCRIPTS).
+# Marks the staged ZIP tree as portable.
+file(GLOB _tops LIST_DIRECTORIES true "${CPACK_TEMPORARY_INSTALL_DIRECTORY}/*")
+set(_dest "${CPACK_TEMPORARY_INSTALL_DIRECTORY}")
+foreach(_t ${_tops})
+  if(IS_DIRECTORY "${_t}/bin")
+    set(_dest "${_t}")
+  endif()
+endforeach()
+file(COPY "@FLEDGE_PORTABLE_TXT@" DESTINATION "${_dest}")
+message(STATUS "Fledge: portable.txt added to ${_dest}")

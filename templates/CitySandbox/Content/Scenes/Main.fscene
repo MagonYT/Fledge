@@ -1,0 +1,397 @@
+{
+  "format": "fscene",
+  "version": 2,
+  "name": "Main",
+  "entities": [
+    {
+      "id": 1,
+      "components": {
+        "Name": {
+          "name": "Sun"
+        },
+        "Transform": {
+          "position": [
+            0,
+            50,
+            0
+          ],
+          "rotation": [
+            -0.3,
+            0.2,
+            0.0,
+            0.93
+          ]
+        },
+        "Light": {
+          "type": "Directional",
+          "color": [
+            1.0,
+            0.95,
+            0.88
+          ],
+          "intensity": 3.2,
+          "castShadows": true,
+          "shadowBias": 0.0006,
+          "normalBias": 1.5
+        }
+      }
+    },
+    {
+      "id": 2,
+      "components": {
+        "Name": {
+          "name": "Camera"
+        },
+        "Transform": {
+          "position": [
+            7.5,
+            3,
+            38
+          ]
+        },
+        "Camera": {
+          "fovDegrees": 65.0,
+          "nearPlane": 0.1,
+          "farPlane": 900.0,
+          "primary": true
+        }
+      }
+    },
+    {
+      "id": 3,
+      "components": {
+        "Name": {
+          "name": "World Settings"
+        },
+        "Transform": {},
+        "Traffic": {
+          "enabled": true,
+          "cars": 40,
+          "pedestrians": 60,
+          "radius": 0,
+          "seed": 1
+        },
+        "TimeOfDay": {
+          "hour": 17.5,
+          "dayMinutes": 24,
+          "latitude": 40
+        },
+        "Weather": {
+          "preset": "Clear",
+          "transition": 15
+        },
+        "AudioMixer": {
+          "master": 1,
+          "music": 0.8,
+          "sfx": 1,
+          "ambient": 0.6,
+          "voice": 1,
+          "ui": 1
+        },
+        "AudioSource": {
+          "clip": "builtin:wind",
+          "bus": "Ambient",
+          "loop": true,
+          "spatial": false,
+          "volume": 0.25
+        }
+      }
+    },
+    {
+      "id": 4,
+      "components": {
+        "Name": {
+          "name": "Player"
+        },
+        "Transform": {
+          "position": [
+            7.5,
+            0.4,
+            32
+          ]
+        },
+        "Animator": {
+          "character": "builtin:mannequin",
+          "rootMotion": false,
+          "color": [
+            0.85,
+            0.55,
+            0.3
+          ]
+        },
+        "CharacterController": {
+          "height": 1.8,
+          "radius": 0.3
+        },
+        "PlayerController": {
+          "walkSpeed": 2.2,
+          "runSpeed": 6.5,
+          "cameraDistance": 5.5,
+          "cameraHeight": 2.2,
+          "defaultHud": true
+        },
+        "Health": {
+          "max": 100,
+          "current": 100,
+          "faction": "player"
+        },
+        "Inventory": {
+          "money": 50
+        },
+        "Wanted": {
+          "enabled": true,
+          "maxPolice": 8
+        }
+      }
+    },
+    {
+      "id": 5,
+      "components": {
+        "Name": {
+          "name": "Garage"
+        },
+        "Transform": {
+          "position": [
+            67,
+            0.06,
+            -96
+          ],
+          "scale": [
+            6,
+            0.1,
+            6
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:sphere",
+          "color": [
+            1.0,
+            0.8,
+            0.1
+          ]
+        },
+        "Tags": {
+          "tags": "marker"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "components": {
+        "Name": {
+          "name": "Cash"
+        },
+        "Transform": {
+          "position": [
+            7.5,
+            0.7,
+            14
+          ],
+          "scale": [
+            0.5,
+            0.5,
+            0.5
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "color": [
+            0.2,
+            0.85,
+            0.3
+          ]
+        },
+        "Rotator": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "degreesPerSecond": 90
+        },
+        "Pickup": {
+          "money": 250,
+          "radius": 1.5
+        }
+      }
+    },
+    {
+      "id": 7,
+      "components": {
+        "Name": {
+          "name": "Pistol"
+        },
+        "Transform": {
+          "position": [
+            -7.5,
+            0.7,
+            44
+          ],
+          "scale": [
+            0.6,
+            0.25,
+            0.25
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "color": [
+            0.2,
+            0.2,
+            0.22
+          ]
+        },
+        "Rotator": {
+          "axis": [
+            0,
+            1,
+            0
+          ],
+          "degreesPerSecond": 90
+        },
+        "Pickup": {
+          "weapon": "pistol",
+          "ammo": 36,
+          "radius": 1.5
+        }
+      }
+    },
+    {
+      "id": 8,
+      "components": {
+        "Name": {
+          "name": "First Job"
+        },
+        "Transform": {},
+        "Mission": {
+          "graph": {
+            "name": "First Job",
+            "nodes": [
+              {
+                "id": 1,
+                "type": "Start",
+                "x": 40,
+                "y": 60
+              },
+              {
+                "id": 2,
+                "type": "Dialogue",
+                "text": "Hey! I need that blue car delivered to the garage. Quick.",
+                "seconds": 4,
+                "x": 220,
+                "y": 60
+              },
+              {
+                "id": 3,
+                "type": "EnterVehicle",
+                "target": "Delivery Car",
+                "text": "Get in the blue car",
+                "x": 400,
+                "y": 60
+              },
+              {
+                "id": 4,
+                "type": "Timer",
+                "seconds": 150,
+                "x": 580,
+                "y": 60
+              },
+              {
+                "id": 5,
+                "type": "DriveTo",
+                "target": "Garage",
+                "radius": 8,
+                "text": "Drive to the garage (yellow marker)",
+                "x": 760,
+                "y": 60
+              },
+              {
+                "id": 6,
+                "type": "Dialogue",
+                "text": "Nice driving. Here's your cut.",
+                "seconds": 3,
+                "x": 940,
+                "y": 60
+              },
+              {
+                "id": 7,
+                "type": "End",
+                "success": true,
+                "reward": 1000,
+                "text": "Job done: $1000",
+                "x": 1120,
+                "y": 60
+              },
+              {
+                "id": 8,
+                "type": "End",
+                "success": false,
+                "text": "Too slow!",
+                "x": 760,
+                "y": 200
+              }
+            ],
+            "links": [
+              {
+                "from": 1,
+                "to": 2
+              },
+              {
+                "from": 2,
+                "to": 3
+              },
+              {
+                "from": 3,
+                "to": 4
+              },
+              {
+                "from": 4,
+                "to": 5
+              },
+              {
+                "from": 5,
+                "to": 6
+              },
+              {
+                "from": 6,
+                "to": 7
+              },
+              {
+                "from": 4,
+                "to": 8,
+                "on": "fail"
+              }
+            ]
+          },
+          "autoStart": true
+        }
+      }
+    },
+    {
+      "id": 9,
+      "components": {
+        "Name": {
+          "name": "Controls Hint"
+        },
+        "Transform": {},
+        "HudElement": {
+          "type": "Text",
+          "anchor": "Bottom",
+          "offset": [
+            0,
+            14,
+            0
+          ],
+          "text": "WASD move  Shift run  Space jump  E enter/exit car  LMB fire  F8/F9 save/load  F10 settings",
+          "color": [
+            1,
+            1,
+            1
+          ],
+          "opacity": 0.75,
+          "textSize": 1.5
+        }
+      }
+    }
+  ]
+}

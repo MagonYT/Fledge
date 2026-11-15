@@ -1,0 +1,5 @@
+# Standard edition initialization shared by all executables.
+add_library(fledge_edition_standard STATIC src/edition_init.cpp)
+target_include_directories(fledge_edition_standard PUBLIC include)
+target_link_libraries(fledge_edition_standard PUBLIC fledge_scene)
+fledge_configure_target(fledge_edition_standard)

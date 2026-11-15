@@ -1,0 +1,5 @@
+add_executable(fledge_mcp_server main.cpp)
+target_link_libraries(fledge_mcp_server PRIVATE fledge_editor_core ${FLEDGE_EDITION_LIB})
+fledge_configure_executable(fledge_mcp_server)
+fledge_add_version_resource(fledge_mcp_server "Fledge MCP Server")
+add_dependencies(fledge_mcp_server fledge_runtime)

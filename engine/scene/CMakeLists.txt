@@ -1,0 +1,2 @@
+fledge_add_library(fledge_scene)
+target_link_libraries(fledge_scene PUBLIC fledge_core)

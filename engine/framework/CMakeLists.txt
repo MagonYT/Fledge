@@ -1,0 +1,2 @@
+fledge_add_library(fledge_framework)
+target_link_libraries(fledge_framework PUBLIC fledge_scene fledge_world fledge_anim fledge_physics fledge_audio fledge_gameplay fledge_assets fledge_script fledge_scripting fledge_render fledge_platform)

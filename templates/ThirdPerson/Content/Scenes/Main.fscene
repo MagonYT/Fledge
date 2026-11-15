@@ -1,0 +1,607 @@
+{
+  "format": "fscene",
+  "version": 2,
+  "name": "Main",
+  "entities": [
+    {
+      "id": 1,
+      "components": {
+        "Name": {
+          "name": "Sun"
+        },
+        "Transform": {
+          "position": [
+            0,
+            20,
+            0
+          ],
+          "rotation": [
+            -0.1225691,
+            0.8772786,
+            0.3367557,
+            0.3193033
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Light": {
+          "type": "Directional",
+          "color": [
+            1.0,
+            0.94,
+            0.85
+          ],
+          "intensity": 3.2,
+          "castShadows": true,
+          "shadowBias": 0.0006,
+          "normalBias": 1.5
+        }
+      }
+    },
+    {
+      "id": 2,
+      "components": {
+        "Name": {
+          "name": "Ground"
+        },
+        "Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            6,
+            1,
+            6
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:plane",
+          "material": "e1e10000000000000000000000000001"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "components": {
+        "Name": {
+          "name": "Player"
+        },
+        "Transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Tags": {
+          "tags": "player"
+        },
+        "Behaviours": {
+          "list": [
+            {
+              "class": "ThirdPersonController",
+              "enabled": true,
+              "properties": {
+                "walkSpeed": 4.0,
+                "sprintSpeed": 8.0
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 4,
+      "components": {
+        "Name": {
+          "name": "Body"
+        },
+        "Transform": {
+          "position": [
+            0,
+            0.9,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.6,
+            1.2,
+            0.4
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000002"
+        }
+      },
+      "parent": 3
+    },
+    {
+      "id": 5,
+      "components": {
+        "Name": {
+          "name": "Head"
+        },
+        "Transform": {
+          "position": [
+            0,
+            1.75,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.42,
+            0.42,
+            0.42
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:sphere",
+          "material": "e1e10000000000000000000000000003"
+        }
+      },
+      "parent": 3
+    },
+    {
+      "id": 6,
+      "components": {
+        "Name": {
+          "name": "Follow Camera"
+        },
+        "Transform": {
+          "position": [
+            0.0,
+            2.6,
+            5.5
+          ],
+          "rotation": [
+            -0.1218693,
+            0.0,
+            0.0,
+            0.9925462
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Camera": {
+          "fovDegrees": 65.0,
+          "nearPlane": 0.1,
+          "farPlane": 600.0,
+          "primary": true
+        },
+        "Behaviours": {
+          "list": [
+            {
+              "class": "CameraFollow",
+              "enabled": true,
+              "properties": {
+                "target": 3,
+                "distance": 5.5,
+                "height": 2.2
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 7,
+      "components": {
+        "Name": {
+          "name": "Crate 1"
+        },
+        "Transform": {
+          "position": [
+            8.2953,
+            0.4453,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.4892615,
+            0.0,
+            0.8721372
+          ],
+          "scale": [
+            0.8905,
+            0.8905,
+            0.8905
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000004"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "components": {
+        "Name": {
+          "name": "Crate 2"
+        },
+        "Transform": {
+          "position": [
+            5.1546,
+            0.5608,
+            5.1546
+          ],
+          "rotation": [
+            0.0,
+            0.283279,
+            0.0,
+            0.9590376
+          ],
+          "scale": [
+            1.1215,
+            1.1215,
+            1.1215
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000004"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "components": {
+        "Name": {
+          "name": "Crate 3"
+        },
+        "Transform": {
+          "position": [
+            0.0,
+            0.5522,
+            7.232
+          ],
+          "rotation": [
+            0.0,
+            0.0294448,
+            0.0,
+            0.9995664
+          ],
+          "scale": [
+            1.1045,
+            1.1045,
+            1.1045
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000004"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "components": {
+        "Name": {
+          "name": "Crate 4"
+        },
+        "Transform": {
+          "position": [
+            -6.1763,
+            0.421,
+            6.1763
+          ],
+          "rotation": [
+            0.0,
+            0.0711856,
+            0.0,
+            0.9974631
+          ],
+          "scale": [
+            0.8419,
+            0.8419,
+            0.8419
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000004"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "components": {
+        "Name": {
+          "name": "Crate 5"
+        },
+        "Transform": {
+          "position": [
+            -8.6981,
+            0.6481,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0970807,
+            0.0,
+            0.9952765
+          ],
+          "scale": [
+            1.2961,
+            1.2961,
+            1.2961
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000004"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "components": {
+        "Name": {
+          "name": "Crate 6"
+        },
+        "Transform": {
+          "position": [
+            -5.5812,
+            0.5882,
+            -5.5812
+          ],
+          "rotation": [
+            0.0,
+            0.6774783,
+            0.0,
+            0.7355427
+          ],
+          "scale": [
+            1.1765,
+            1.1765,
+            1.1765
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000004"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "components": {
+        "Name": {
+          "name": "Crate 7"
+        },
+        "Transform": {
+          "position": [
+            -0.0,
+            0.519,
+            -9.3084
+          ],
+          "rotation": [
+            0.0,
+            0.6937976,
+            0.0,
+            0.72017
+          ],
+          "scale": [
+            1.038,
+            1.038,
+            1.038
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000004"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "components": {
+        "Name": {
+          "name": "Crate 8"
+        },
+        "Transform": {
+          "position": [
+            5.0815,
+            0.6575,
+            -5.0815
+          ],
+          "rotation": [
+            0.0,
+            0.2255023,
+            0.0,
+            0.9742426
+          ],
+          "scale": [
+            1.3151,
+            1.3151,
+            1.3151
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000004"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "components": {
+        "Name": {
+          "name": "Ramp"
+        },
+        "Transform": {
+          "position": [
+            -6,
+            0.6,
+            -6
+          ],
+          "rotation": [
+            0.1009667,
+            0.2574012,
+            -0.027054,
+            0.9606344
+          ],
+          "scale": [
+            3,
+            0.3,
+            6
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000005"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "components": {
+        "Name": {
+          "name": "Platform"
+        },
+        "Transform": {
+          "position": [
+            6,
+            1.0,
+            -7
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            4,
+            2,
+            4
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:cube",
+          "material": "e1e10000000000000000000000000005"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "components": {
+        "Name": {
+          "name": "Goal Marker"
+        },
+        "Transform": {
+          "position": [
+            6,
+            2.6,
+            -7
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            0.6,
+            0.6,
+            0.6
+          ]
+        },
+        "MeshRenderer": {
+          "mesh": "builtin:sphere",
+          "material": "e1e10000000000000000000000000006"
+        },
+        "Behaviours": {
+          "list": [
+            {
+              "class": "Spinner",
+              "enabled": true,
+              "properties": {
+                "degreesPerSecond": 60.0
+              }
+            },
+            {
+              "class": "GoalTrigger",
+              "enabled": true,
+              "properties": {
+                "radius": 2.5
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": 18,
+      "components": {
+        "Name": {
+          "name": "Goal Light"
+        },
+        "Transform": {
+          "position": [
+            6,
+            3.2,
+            -7
+          ],
+          "rotation": [
+            0,
+            0,
+            0,
+            1
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "Light": {
+          "type": "Point",
+          "color": [
+            0.3,
+            0.8,
+            1.0
+          ],
+          "intensity": 8.0,
+          "range": 8.0
+        }
+      }
+    }
+  ]
+}

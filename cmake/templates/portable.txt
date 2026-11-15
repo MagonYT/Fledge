@@ -1,0 +1,1 @@
+This file enables Fledge portable mode: settings, layouts and recent projects are stored in UserData/ next to bin/ instead of %APPDATA%\Fledge. Delete it to use %APPDATA%\Fledge.

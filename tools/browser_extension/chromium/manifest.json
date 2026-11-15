@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Send to Fledge",
+  "version": "27.1.3",
+  "description": "Adds 'Send to Fledge' on fab.com and Unity Asset Store pages and offers store downloads to the Fledge editor. Sends nothing anywhere: it only opens fledge:// links.",
+  "permissions": ["downloads"],
+  "host_permissions": ["https://www.fab.com/*", "https://fab.com/*", "https://assetstore.unity.com/*"],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": ["https://www.fab.com/*", "https://fab.com/*", "https://assetstore.unity.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

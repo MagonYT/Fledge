@@ -1,0 +1,25 @@
+{
+  "format": "fledgeproject",
+  "version": 1,
+  "name": "Empty",
+  "gameName": "Empty",
+  "startupScene": "Scenes/Main.fscene",
+  "modules": [],
+  "window": {
+    "title": "Empty",
+    "width": 1280,
+    "height": 720
+  },
+  "cook": {
+    "textureCompression": "auto",
+    "mips": true,
+    "tangents": true
+  },
+  "render": {
+    "tonemapper": "ACES",
+    "exposure": 0.0,
+    "bloom": true,
+    "shadows": true,
+    "showSky": true
+  }
+}

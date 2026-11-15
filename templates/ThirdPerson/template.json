@@ -1,0 +1,14 @@
+{
+  "name": "Third-person starter",
+  "order": 1,
+  "status": "starter (Fledge Script files, no physics yet)",
+  "description": "A scripted player: WASD / arrows move relative to the camera, Shift sprints, Space jumps, the camera follows with mouse orbit, and a mission service waits for the goal marker. Movement ignores obstacles until physics exists.",
+  "tags": [
+    "third-person",
+    "character",
+    "script"
+  ],
+  "format": "fledgetemplate",
+  "version": 1,
+  "id": "ThirdPerson"
+}

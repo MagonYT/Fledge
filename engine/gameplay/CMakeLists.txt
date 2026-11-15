@@ -1,0 +1,2 @@
+fledge_add_library(fledge_gameplay)
+target_link_libraries(fledge_gameplay PUBLIC fledge_world fledge_core PRIVATE recastnav stb)

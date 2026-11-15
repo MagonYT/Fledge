@@ -1,0 +1,12 @@
+{
+  "name": "Empty",
+  "order": 0,
+  "status": "complete",
+  "description": "A camera, a sun and a ground plane. Start from scratch.",
+  "tags": [
+    "basic"
+  ],
+  "format": "fledgetemplate",
+  "version": 1,
+  "id": "Empty"
+}

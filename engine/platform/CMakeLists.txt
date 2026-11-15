@@ -1,0 +1,2 @@
+fledge_add_library(fledge_platform)
+target_link_libraries(fledge_platform PUBLIC fledge_core PRIVATE glfw)

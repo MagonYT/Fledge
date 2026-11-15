@@ -1,0 +1,41 @@
+{
+  "format": "fledgeassets",
+  "version": 1,
+  "assets": [
+    {
+      "guid": "e1e10000000000000000000000000001",
+      "path": "Materials/Ground.fmat",
+      "type": "Material"
+    },
+    {
+      "guid": "e1e10000000000000000000000000002",
+      "path": "Materials/Player.fmat",
+      "type": "Material"
+    },
+    {
+      "guid": "e1e10000000000000000000000000003",
+      "path": "Materials/PlayerHead.fmat",
+      "type": "Material"
+    },
+    {
+      "guid": "e1e10000000000000000000000000004",
+      "path": "Materials/Crate.fmat",
+      "type": "Material"
+    },
+    {
+      "guid": "e1e10000000000000000000000000005",
+      "path": "Materials/Concrete.fmat",
+      "type": "Material"
+    },
+    {
+      "guid": "e1e10000000000000000000000000006",
+      "path": "Materials/Marker.fmat",
+      "type": "Material"
+    },
+    {
+      "guid": "e1e10000000000000000000000000007",
+      "path": "Scenes/Main.fscene",
+      "type": "Scene"
+    }
+  ]
+}

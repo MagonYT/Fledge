@@ -1,0 +1,16 @@
+{
+  "format": "fledgeassets",
+  "version": 1,
+  "assets": [
+    {
+      "guid": "e0e00000000000000000000000000001",
+      "path": "Materials/Ground.fmat",
+      "type": "Material"
+    },
+    {
+      "guid": "e0e00000000000000000000000000002",
+      "path": "Scenes/Main.fscene",
+      "type": "Scene"
+    }
+  ]
+}

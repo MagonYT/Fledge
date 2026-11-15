@@ -1,0 +1,78 @@
+{
+  "name": "City Sandbox",
+  "order": 2,
+  "status": "complete",
+  "description": "A playable 4 x 4 block city: walk, drive and carjack, ambient traffic and pedestrians, police and a wanted level, a delivery mission, pickups, a day/night cycle, a HUD with minimap, and quick save / load. Everything is built-in (no scripts needed); add Fledge Script files to extend it.",
+  "tags": [
+    "open-world",
+    "city",
+    "driving",
+    "gta-like"
+  ],
+  "format": "fledgetemplate",
+  "version": 1,
+  "id": "CitySandbox",
+  "generate": {
+    "city": {
+      "blocksX": 4,
+      "blocksZ": 4,
+      "blockSize": 64,
+      "roadWidth": 12,
+      "sidewalk": 3,
+      "seed": 7,
+      "origin": [
+        -128,
+        0,
+        -128
+      ],
+      "name": "City"
+    },
+    "vehicles": [
+      {
+        "preset": "car",
+        "position": [
+          5.1,
+          0,
+          24
+        ],
+        "yaw": 0,
+        "name": "Delivery Car",
+        "color": [
+          0.15,
+          0.3,
+          0.8
+        ]
+      },
+      {
+        "preset": "car",
+        "position": [
+          -5.1,
+          0,
+          50
+        ],
+        "yaw": 3.14159,
+        "name": "Parked Car",
+        "color": [
+          0.8,
+          0.8,
+          0.78
+        ]
+      },
+      {
+        "preset": "truck",
+        "position": [
+          -150.0,
+          0,
+          10
+        ],
+        "yaw": 0,
+        "name": "Truck",
+        "color": [
+          0.85,
+          0.5,
+          0.1
+        ]
+      }
+    ]
+  }
+}

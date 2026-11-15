@@ -1,0 +1,41 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 24, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "ninja-gcc",
+      "displayName": "Ninja + MinGW g++ (Debug)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-gcc",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++"
+      }
+    },
+    {
+      "name": "ninja-gcc-release",
+      "inherits": "ninja-gcc",
+      "displayName": "Ninja + MinGW g++ (Release)",
+      "binaryDir": "${sourceDir}/build/ninja-gcc-release",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "ninja-clang",
+      "displayName": "Ninja + clang (untested here)",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/ninja-clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_C_COMPILER": "clang", "CMAKE_CXX_COMPILER": "clang++" }
+    },
+    {
+      "name": "vs2022",
+      "displayName": "Visual Studio 2022 (untested here)",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/vs2022"
+    }
+  ],
+  "buildPresets": [
+    { "name": "ninja-gcc", "configurePreset": "ninja-gcc" },
+    { "name": "ninja-gcc-release", "configurePreset": "ninja-gcc-release" }
+  ]
+}

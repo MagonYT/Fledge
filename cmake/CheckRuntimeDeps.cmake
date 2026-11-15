@@ -1,0 +1,32 @@
+# Walks the (direct + transitive) LINK_LIBRARIES of a target at configure time
+# and fails if any forbidden target appears. Used to guarantee that the
+# shipping runtime never links editor / AI / MCP / credential code.
+function(_fledge_collect_deps target out_var)
+  set(_visited ${${out_var}})
+  if(NOT TARGET ${target})
+    return()
+  endif()
+  get_target_property(_libs ${target} LINK_LIBRARIES)
+  get_target_property(_ilibs ${target} INTERFACE_LINK_LIBRARIES)
+  foreach(_l IN LISTS _libs _ilibs)
+    if(_l AND TARGET ${_l} AND NOT _l IN_LIST _visited)
+      list(APPEND _visited ${_l})
+      set(${out_var} ${_visited})
+      _fledge_collect_deps(${_l} ${out_var})
+      set(_visited ${${out_var}})
+    endif()
+  endforeach()
+  set(${out_var} ${_visited} PARENT_SCOPE)
+endfunction()
+
+function(fledge_check_forbidden_deps target)
+  set(_deps "")
+  _fledge_collect_deps(${target} _deps)
+  foreach(_bad IN LISTS ARGN)
+    if(_bad IN_LIST _deps)
+      message(FATAL_ERROR "Dependency rule violated: ${target} links forbidden target '${_bad}'. "
+                          "The runtime must never depend on editor/AI/MCP code (see docs/ARCHITECTURE.md).")
+    endif()
+  endforeach()
+  message(STATUS "Fledge: ${target} dependency check OK (links: ${_deps})")
+endfunction()

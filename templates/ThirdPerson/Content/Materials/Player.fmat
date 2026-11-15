@@ -1,0 +1,29 @@
+{
+  "format": "fmat",
+  "version": 1,
+  "shader": "Lit",
+  "baseColor": [
+    0.95,
+    0.45,
+    0.1
+  ],
+  "opacity": 1.0,
+  "baseColorTexture": "",
+  "normalTexture": "",
+  "normalScale": 1.0,
+  "metallicRoughnessTexture": "",
+  "roughness": 0.45,
+  "metallic": 0.0,
+  "occlusionTexture": "",
+  "occlusionStrength": 1.0,
+  "emissive": [
+    0,
+    0,
+    0
+  ],
+  "emissiveIntensity": 1.0,
+  "emissiveTexture": "",
+  "twoSided": false,
+  "alphaMode": "Opaque",
+  "alphaCutoff": 0.5
+}

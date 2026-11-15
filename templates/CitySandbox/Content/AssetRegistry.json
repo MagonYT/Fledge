@@ -1,0 +1,11 @@
+{
+  "format": "fledgeassets",
+  "version": 1,
+  "assets": [
+    {
+      "guid": "c1c10000000000000000000000000001",
+      "path": "Scenes/Main.fscene",
+      "type": "Scene"
+    }
+  ]
+}

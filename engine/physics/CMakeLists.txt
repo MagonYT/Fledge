@@ -1,0 +1,2 @@
+fledge_add_library(fledge_physics)
+target_link_libraries(fledge_physics PUBLIC fledge_scene fledge_core PRIVATE fledge_anim Jolt)

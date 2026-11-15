@@ -1,0 +1,48 @@
+# Build outputs and downloaded dependencies
+/build/
+/out/
+/dist/
+**/Build/
+**/Intermediate/
+CMakeUserPresets.json
+compile_commands.json
+*.obj
+*.o
+*.pdb
+*.exe
+*.dll
+*.zip
+
+# Local editor state and personal configuration
+imgui.ini
+editor_settings.json
+editor_layout.ini
+FLEDGE_settings/
+.vs/
+.vscode/
+.idea/
+*.user
+*.log
+
+# Credentials
+.env
+.env.*
+*.key
+*.pem
+*.pfx
+*.p12
+
+# Private development material excluded from this source distribution
+.claude/
+.cursor/
+/tests/
+/launcher/
+/docs/
+/samples/
+/engine/advanced/
+HANDOFF*
+
+# Generated script project files
+**/Scripts/compile_commands.json
+**/Scripts/.clangd
+/templates/*/Scripts/CMakeLists.txt
