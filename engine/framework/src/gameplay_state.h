@@ -75,7 +75,13 @@ struct GameWorld::GameplayState {
     float baseEnvIntensity = 1, baseExposure = 0;
     RenderSettings baseFog;  // the project's fog fields, restored at the end (weather drives fog while playing)
     float skyBrightness = 1;  // sky light scale this frame (weather particles)
-    float wetness = -1;       // surface wetness from the rain (< 0: not started; starts at the project's wetness)
+    gameplay::HydrologyConfig hydrologyConfig;
+    gameplay::HydrologyState hydrology;  // transient rain storage; reset each play session
+    gameplay::TerrainWater terrainWater;
+    EntityId waterTerrain = kNullEntity;
+    bool waterTerrainTried = false;
+    Mat4 waterTerrainMatrix;
+    double weatherRemainder = 0;         // fixed 60 Hz weather/hydrology clock
     std::map<EntityId, gameplay::ParticleEmitter> emitters;
     std::map<std::string, std::optional<gameplay::UiDocument>> uiDocs;  // UiScreen documents by ref (nullopt = failed)
     bool pointerWasDown = false;

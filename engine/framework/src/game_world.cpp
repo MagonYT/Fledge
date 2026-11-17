@@ -214,6 +214,17 @@ Status GameWorld::loadScene(const std::string& vpath) {
     Json j = Json::parse(*text, nullptr, false);
     if (j.is_discarded()) return Status::failure("scene is not valid JSON: " + vpath);
     if (auto st = m_scene.fromJson(j); !st) return st;
+    if (m_gp) {  // water/weather history belongs to the old scene, not its replacement
+        m_gp->hydrology = {};
+        m_gp->terrainWater.reset();
+        m_gp->waterTerrain = kNullEntity;
+        m_gp->waterTerrainTried = false;
+        m_gp->weatherRemainder = 0;
+        m_gp->weatherPreset = -1;
+        m_gp->weatherNow = {};
+        renderSettings.wetness = m_gp->baseFog.wetness;
+        renderSettings.puddles = m_gp->baseFog.puddles;
+    }
     m_scenePath = vpath;
     m_cookedWorldIndex = Json();
     m_cookedWorldDir.clear();

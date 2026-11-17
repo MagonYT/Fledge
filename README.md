@@ -61,7 +61,9 @@ The ambition is an approachable engine for expressive, interactive environments:
 
 > **About weather and fluids**
 >
-> Weather-driven surface effects are not the same as a full fluid solver. Physically simulated rainfall, individual droplets on glass, and water accumulation with drainage are future ambitions—not features promised by this source release.
+> During play, weather feeds a bounded **CPU terrain surface-water patch**: 64×64 cell-centred heights sampled from the first usable terrain (at most eight terrain candidates), covering its central square up to 256 m wide. Metre-based storage, rainfall, drainage/evaporation and conservative downhill hydraulic-head relaxation run at 20 Hz, at most four substeps per update; stalls beyond 0.2 s are discarded rather than queued. The solver owns ~64 KiB, allocates nothing while stepping, and uses closed boundaries (no cross-patch flow). Horizontal terrain with yaw and equal positive horizontal scale is supported; unsupported/no terrain retains the lumped reservoir fallback. Terrain edits through procedural invalidation, terrain cache rebuilds, transform changes and scene/play restart reset storage; new terrain after initial selection requires invalidation/restart. Water is transient, not quicksaved.
+>
+> **Rendering is still aggregate only:** area-averaged storage drives the existing scene-wide procedural wetness/puddle shader, preserving authored wetness floors and puddle limits (zero disables puddles). The spatial depths are CPU data, not spatially placed visible puddles, water geometry, buoyancy or a momentum-based fluid simulation. Buildings/roads do not obstruct flow, rain is not roof-occluded, and glass droplets remain unimplemented. Backend appearance/parity has not been visually verified. An external actual-solver harness passed conservation, equilibrium, downhill pooling, nonnegative/finite safety, source/sink and budget checks; on Ryzen 7 5700X3D / Windows / MinGW GCC 13.2 C++20 `-O2`, 10,000 batches of four ticks plus aggregation averaged 0.166–0.171 ms/batch across three runs (64×64, zero stepping allocations verified). This microbenchmark excludes terrain sampling, engine/render costs and is not a frame-time guarantee.
 
 ## Getting started
 
@@ -170,6 +172,15 @@ cmake --build build/ninja-gcc-release --target installer
 ```
 
 Installer tooling may require additional downloads. Packaging commands are provided by the build configuration, but have not been validated end-to-end for this export.
+
+### Game content packages (.fpak)
+
+`fledgepack` ships a project's cooked content in a single `.fpak` archive (embedded into the game executable by default, or written next to it with `--sidecar`). Two container generations exist; the runtime and tools read **both** transparently:
+
+- **v2 `CAGEPAK2` (default)** — content-addressed chunked container. Every asset is split into 64 KiB raw chunks; each chunk is compressed independently (Fledge-LZ is kept only when it measurably shrinks that chunk, so already-compressed data such as BC textures, PNG/JPG and audio is stored raw) and stored once under the hash of its raw bytes, so duplicated content is stored a single time. Changing one asset only rewrites that asset's chunks, and `--no-incremental` is never needed for correctness: with incremental packaging enabled (the default) the packager carries unchanged chunks over from the previous package without re-compressing them. Output is written atomically (temporary file + rename), so a game never sees a half-written archive.
+- **v1 `CAGEPAK1` (legacy)** — the original monolithic layout (`--legacy-pak` to write). Kept for compatibility with already-shipped games; new packages default to v2.
+
+Useful flags: `--sidecar` (write `Game.fpak` next to the exe instead of embedding), `--legacy-pak` (write the v1 format), `--no-incremental` (rebuild every chunk from scratch), `--list <file.fpak|Game.exe>` (inspect either format).
 
 ### Build options
 

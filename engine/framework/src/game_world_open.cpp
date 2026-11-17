@@ -7,6 +7,7 @@
 #include "fledge/core/log.h"
 #include "fledge/framework/game_world.h"
 #include "fledge/world/roads.h"
+#include "gameplay_state.h"
 
 namespace fledge {
 
@@ -47,6 +48,11 @@ const world::Heightfield* GameWorld::heightfield(EntityId e) {
     h = hashStr(h, std::format("{} {} {} {} {}", tc->size, tc->resolution, tc->seed, tc->maxHeight, tc->tileSize));
     TerrainCache& c = m_terrains[e];
     if (c.hash != h || c.field.resolution() == 0) {
+        if (m_gp && m_gp->waterTerrain == e) {
+            m_gp->terrainWater.reset();
+            m_gp->waterTerrain = kNullEntity;
+            m_gp->waterTerrainTried = false;
+        }
         c.field = world::Heightfield::fromComponent(*tc);
         c.hash = h;
         c.lods.clear();
@@ -75,6 +81,11 @@ std::optional<float> GameWorld::terrainHeight(float x, float z) {
 }
 
 void GameWorld::invalidateProcedural(EntityId e) {
+    if (m_gp && (m_gp->waterTerrain == e || m_scene.get<TerrainComponent>(e))) {
+        m_gp->terrainWater.reset();
+        m_gp->waterTerrain = kNullEntity;
+        m_gp->waterTerrainTried = false;
+    }
     std::string prefix = std::format("proc:{}/", e);
     for (auto it = m_procHash.begin(); it != m_procHash.end();) {
         if (startsWith(it->first, prefix)) {

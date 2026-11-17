@@ -298,6 +298,7 @@ void GameWorld::endGameplay() {
         renderSettings.fogHeightFalloff = b.fogHeightFalloff;
         renderSettings.fogColor = b.fogColor;
         renderSettings.wetness = b.wetness;
+        renderSettings.puddles = b.puddles;
     }
     if (m_gp->rainVoice) m_mixer.stop(m_gp->rainVoice);
     for (EntityId e : m_gp->trafficCars)
@@ -984,28 +985,101 @@ void GameWorld::lateGameplay(float dt) {
         wc->level = g.wanted.level;
         wc->heat = g.wanted.heat;
     }
-    // time of day + weather
+    // A single stationary 64x64 patch; sample only at initialization/invalidation.
+    // Translation/yaw/uniform horizontal scale supported; tilted terrain falls back.
+    if (g.waterTerrain != kNullEntity) {
+        bool changed = !m_scene.isValid(g.waterTerrain) || !m_scene.get<TerrainComponent>(g.waterTerrain);
+        if (!changed) {
+            const Mat4 now = m_scene.worldTransform(g.waterTerrain).matrix();
+            for (int c = 0; c < 4; ++c) {
+                const Vec4 a = now.c[c], b = g.waterTerrainMatrix.c[c];
+                changed |= a.x != b.x || a.y != b.y || a.z != b.z || a.w != b.w;
+            }
+        }
+        if (changed) {
+            g.terrainWater.reset();
+            g.waterTerrain = kNullEntity;
+            g.waterTerrainTried = false;
+        }
+    }
+    if (!g.waterTerrainTried) {
+        g.waterTerrainTried = true;
+        int candidates = 0;
+        for (EntityId e : m_scene.entities()) {
+            if (!m_scene.get<TerrainComponent>(e)) continue;
+            if (++candidates > 8) break; // bounded terrain candidate work
+            const Mat4 matrix = m_scene.worldTransform(e).matrix();
+            const Vec3 x = matrix.c[0].xyz(), y = matrix.c[1].xyz(), z = matrix.c[2].xyz();
+            const float sx = length(x), sz = length(z);
+            if (!std::isfinite(sx) || !std::isfinite(sz) || sx <= 0 ||
+                std::abs(x.y) > 1e-5f || std::abs(z.y) > 1e-5f ||
+                std::abs(y.x) > 1e-5f || std::abs(y.z) > 1e-5f || y.y <= 0 ||
+                std::abs(sx - sz) > 1e-5f * sx) continue;
+            const world::Heightfield* hf = heightfield(e);
+            if (!hf || hf->resolution() < 2 || !std::isfinite(hf->size()) || hf->size() <= 0) continue;
+            // At most a central 256m square, never the entire streamed world.
+            const double extent = std::min(256.0, static_cast<double>(hf->size()) * sx);
+            const double spacing = extent / TerrainWater::resolution;
+            std::array<double, TerrainWater::cells> bed;
+            for (int iz = 0; iz < TerrainWater::resolution; ++iz)
+                for (int ix = 0; ix < TerrainWater::resolution; ++ix) {
+                    const float lx = static_cast<float>(((ix + 0.5) * spacing - extent * 0.5) / sx);
+                    const float lz = static_cast<float>(((iz + 0.5) * spacing - extent * 0.5) / sx);
+                    bed[iz * TerrainWater::resolution + ix] = matrix.transformPoint({lx, hf->heightAt(lx, lz), lz}).y;
+                }
+            if (g.terrainWater.initialize(bed, spacing)) {
+                g.waterTerrain = e;
+                g.waterTerrainMatrix = matrix;
+                break;
+            }
+        }
+    }
+    // Weather and water storage also run without a TimeOfDay component.
+    int preset = 0;
+    float transition = 10;
+    for (EntityId w : m_scene.entities())
+        if (auto* wc = m_scene.get<WeatherComponent>(w)) {
+            preset = static_cast<int>(wc->preset);
+            transition = std::isfinite(wc->transition) ? std::max(0.0f, wc->transition) : 0.0f;
+        }
+    if (preset != g.weatherPreset) {
+        g.weatherFrom = g.weatherPreset < 0 ? weatherPreset(static_cast<WeatherKind>(preset)) : g.weatherNow;
+        g.weatherTo = weatherPreset(static_cast<WeatherKind>(preset));
+        g.weatherT = g.weatherPreset < 0 || transition <= 0 ? 1.0f : 0.0f;
+        g.weatherPreset = preset;
+    }
+    // Shared weather budget: <=12 weather ticks and <=4 water ticks/frame.
+    // Discard stall time in both fallback and terrain modes; never catch up forever.
+    const double waterDt = std::isfinite(dt) ? std::clamp(static_cast<double>(dt), 0.0, 0.2) : 0.0;
+    // Fixed weather sampling avoids frame-rate-dependent rainfall during blends.
+    // Keep fractional time, rather than rounding away rainfall at high frame rates.
+    constexpr double weatherStep = 1.0 / 60.0;
+    g.weatherRemainder += waterDt;
+    g.weatherNow = blend(g.weatherFrom, g.weatherTo, g.weatherT);
+    while (g.weatherRemainder + 1e-12 >= weatherStep) {
+        g.weatherT = std::min(1.0f, g.weatherT + (transition > 0 ? static_cast<float>(weatherStep / transition) : 1.0f));
+        g.weatherNow = blend(g.weatherFrom, g.weatherTo, g.weatherT);
+        g.hydrology = stepHydrology(g.hydrology, g.weatherNow.rain, weatherStep, g.hydrologyConfig);
+        g.terrainWater.advance(g.weatherNow.rain, weatherStep, g.hydrologyConfig);
+        g.weatherRemainder = std::max(0.0, g.weatherRemainder - weatherStep);
+        if (g.weatherT >= 1 && g.weatherRemainder >= weatherStep) {
+            // Constant forcing is analytic: consume whole ticks in O(1), even after a long stall.
+            const double whole = std::floor(g.weatherRemainder / weatherStep) * weatherStep;
+            g.hydrology = stepHydrology(g.hydrology, g.weatherNow.rain, whole, g.hydrologyConfig);
+            g.terrainWater.advance(g.weatherNow.rain, whole, g.hydrologyConfig);
+            g.weatherRemainder -= whole;
+        }
+    }
+    const auto storage = g.terrainWater.active() ? g.terrainWater.equivalentStorage(g.hydrologyConfig) : g.hydrology;
+    const auto surface = hydrologySurface(storage, g.baseFog.wetness, g.baseFog.puddles, g.hydrologyConfig);
+    renderSettings.wetness = surface.wetness;
+    renderSettings.puddles = surface.puddles;
+    // time of day lighting
     for (EntityId e : m_scene.entities()) {
         auto* tod = m_scene.get<TimeOfDayComponent>(e);
         if (!tod) continue;
         if (tod->dayMinutes > 0) tod->hour = std::fmod(tod->hour + dt * 24.0f / (tod->dayMinutes * 60.0f), 24.0f);
-        SkyLight sky = skyAt(tod->hour, tod->latitude, 172);
-        int preset = 0;
-        float transition = 10;
-        for (EntityId w : m_scene.entities())
-            if (auto* wc = m_scene.get<WeatherComponent>(w)) {
-                preset = static_cast<int>(wc->preset);
-                transition = wc->transition;
-            }
-        if (preset != g.weatherPreset) {
-            g.weatherFrom = g.weatherPreset < 0 ? weatherPreset(static_cast<WeatherKind>(preset)) : g.weatherNow;
-            g.weatherTo = weatherPreset(static_cast<WeatherKind>(preset));
-            g.weatherT = g.weatherPreset < 0 || transition <= 0 ? 1.0f : 0.0f;
-            g.weatherPreset = preset;
-        }
-        g.weatherT = std::min(1.0f, g.weatherT + (transition > 0 ? dt / transition : 1.0f));
-        g.weatherNow = blend(g.weatherFrom, g.weatherTo, g.weatherT);
-        sky = applyWeather(sky, g.weatherNow);
+        SkyLight sky = applyWeather(skyAt(tod->hour, tod->latitude, 172), g.weatherNow);
         EntityId sun = tod->sun.empty() ? kNullEntity : m_scene.findByName(tod->sun);
         if (!sun)
             for (EntityId l : m_scene.entities())
@@ -1032,11 +1106,10 @@ void GameWorld::lateGameplay(float dt) {
             renderSettings.fogHeightFalloff = bf.fog ? bf.fogHeightFalloff + (wf.heightFalloff - bf.fogHeightFalloff) * t : wf.heightFalloff;
             renderSettings.fogColor = lerp(bf.fogColor * sky.environment, wf.color * g.baseEnvIntensity, t);
         }
-        // wet surfaces: the ground soaks while it rains and dries slowly afterwards (wetnessStep(), docs/GRAPHICS.md)
-        if (g.wetness < 0) g.wetness = g.baseFog.wetness;
-        g.wetness = wetnessStep(g.wetness, g.weatherNow.rain, dt);
-        renderSettings.wetness = std::max(g.baseFog.wetness, g.wetness);
-        // rain sound
+        break;
+    }
+    // rain sound (independent of time-of-day lighting)
+    {
         if (g.weatherNow.rain > 0.02f) {
             audio::VoiceParams vp;
             vp.bus = audio::Bus::Ambient;
@@ -1051,7 +1124,6 @@ void GameWorld::lateGameplay(float dt) {
             m_mixer.stop(g.rainVoice);
             g.rainVoice = 0;
         }
-        break;
     }
     // particles: weather rain around the viewer, ParticleEmitter components (wind from the weather)
     if (m_lastRebase != Vec3{0, 0, 0}) {  // floating origin moved the world last tick: move world-space particles too

@@ -28,7 +28,7 @@
 #include <string>
 
 #include "fledge/assets/image.h"
-#include "fledge/assets/pak.h"
+#include "fledge/assets/package.h"
 #include "fledge/core/log.h"
 #include "fledge/core/log_file.h"
 #include "fledge/core/paths.h"
@@ -137,17 +137,36 @@ int main(int argc, char** argv) {
     Vfs vfs;
     std::string source;
 
+    // Both container generations are readable: v2 "CAGEPAK2" (chunked) and
+    // v1 "CAGEPAK1" (legacy monolithic); openGamePackage dispatches on magic.
+    auto mountPackage = [&](GamePackage&& pkg, const char* what) {
+        source = std::string(what) + (pkg.format == PakFormat::V2 ? " (v2)" : " (v1)");
+        vfs.mount("content", providerFor(pkg));  // provider shares ownership of the reader
+    };
+    auto openAppendedPackage = [&](const fs::path& e) -> GamePackage {
+        // Only an appended pak counts here; a bare runtime has no footer.
+        if (auto r = FpackReader::openAppended(e)) {
+            GamePackage g;
+            g.format = PakFormat::V2;
+            g.v2 = std::move(r);
+            return g;
+        }
+        if (auto r = PakReader::openAppended(e)) {
+            GamePackage g;
+            g.format = PakFormat::V1;
+            g.v1 = std::move(r);
+            return g;
+        }
+        return {};
+    };
     if (!args.pak.empty()) {
-        auto pak = PakReader::openFile(args.pak);
-        if (!pak) { FLEDGE_LOG_ERROR("runtime", "Cannot open pak {}", narrow(args.pak.wstring())); return 2; }
-        vfs.mount("content", std::make_shared<PakProvider>(std::move(pak)));
-        source = "pak file";
-    } else if (auto appended = PakReader::openAppended(exe)) {
-        vfs.mount("content", std::make_shared<PakProvider>(std::move(appended)));
-        source = "embedded pak";
-    } else if (auto side = PakReader::openFile(exe.parent_path() / (exe.stem().wstring() + L".fpak"))) {
-        vfs.mount("content", std::make_shared<PakProvider>(std::move(side)));
-        source = "sidecar pak";
+        auto pkg = openGamePackage(args.pak);
+        if (!pkg) { FLEDGE_LOG_ERROR("runtime", "Cannot open pak {}", narrow(args.pak.wstring())); return 2; }
+        mountPackage(std::move(pkg), "pak file");
+    } else if (auto appended = openAppendedPackage(exe)) {
+        mountPackage(std::move(appended), "embedded pak");
+    } else if (auto side = openGamePackage(exe.parent_path() / (exe.stem().wstring() + L".fpak"))) {
+        mountPackage(std::move(side), "sidecar pak");
     } else if (!args.project.empty()) {
         auto p = Project::load(args.project);
         if (!p) { FLEDGE_LOG_ERROR("runtime", "{}", p.error()); return 2; }

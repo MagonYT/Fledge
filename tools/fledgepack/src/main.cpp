@@ -10,7 +10,7 @@
 #include <cstdio>
 #include <string>
 
-#include "fledge/assets/pak.h"
+#include "fledge/assets/package.h"
 #include "fledge/core/log.h"
 #include "fledge/edition/edition.h"
 #include "fledge/packager/cooker.h"
@@ -22,9 +22,10 @@ using namespace fledge;
 static int usage() {
     std::fprintf(stderr,
                  "usage:\n"
-                 "  fledgepack <project.fledge> [--out dir] [--runtime exe] [--modules dir] [--sidecar] [--no-compress] [--no-icon] [--gui|--console]\n"
+                 "  fledgepack <project.fledge> [--out dir] [--runtime exe] [--modules dir] [--sidecar] [--no-compress]\n"
+                 "             [--legacy-pak] [--no-incremental] [--no-icon] [--gui|--console]\n"
                  "  fledgepack --cook <project.fledge> [--force]\n"
-                 "  fledgepack --pak-only <project.fledge> <out.fpak>\n"
+                 "  fledgepack --pak-only <project.fledge> <out.fpak> [--legacy-pak]\n"
                  "  fledgepack --list <file.fpak | Game.exe>\n"
                  "  fledgepack --build-scripts <project.fledge> [--release | --debug] [--force] [--compiler g++.exe]\n"
                  "  fledgepack --new-script <project.fledge> <ClassName> [behaviour|service|character|empty]\n");
@@ -37,12 +38,19 @@ int main(int argc, char** argv) {
     std::string first = argv[1];
     if (first == "--list" && argc == 3) {
         fs::path p = pathFromUtf8(argv[2]);
-        auto pak = PakReader::openAppended(p);
-        if (!pak) pak = PakReader::openFile(p);
-        if (!pak) { std::fprintf(stderr, "not a pak or packaged game: %s\n", argv[2]); return 2; }
-        for (auto& [path, e] : pak->entries())
-            std::printf("%-40s %10llu -> %10llu  %s  crc=%08x\n", path.c_str(), static_cast<unsigned long long>(e.originalSize),
-                        static_cast<unsigned long long>(e.storedSize), e.compression == PakCompression::Lz ? "lz " : "raw", e.crc);
+        auto pkg = openGamePackage(p);
+        if (!pkg) { std::fprintf(stderr, "not a pak or packaged game: %s\n", argv[2]); return 2; }
+        if (pkg.format == PakFormat::V2) {
+            std::printf("format: v2 (content-addressed chunks, %zu chunks)\n", pkg.v2->chunks().size());
+            for (auto& [path, e] : pkg.v2->entries())
+                std::printf("%-40s %10llu  %5zu chunk(s)  crc=%08x\n", path.c_str(), static_cast<unsigned long long>(e.rawSize),
+                            e.chunks.size(), e.crc);
+        } else {
+            std::printf("format: v1 (legacy)\n");
+            for (auto& [path, e] : pkg.v1->entries())
+                std::printf("%-40s %10llu -> %10llu  %s  crc=%08x\n", path.c_str(), static_cast<unsigned long long>(e.originalSize),
+                            static_cast<unsigned long long>(e.storedSize), e.compression == PakCompression::Lz ? "lz " : "raw", e.crc);
+        }
         return 0;
     }
     if (first == "--cook" && argc >= 3) {
@@ -104,12 +112,13 @@ int main(int argc, char** argv) {
         std::printf("created %s\n", narrow(r->wstring()).c_str());
         return 0;
     }
-    if (first == "--pak-only" && argc == 4) {
+    if (first == "--pak-only" && argc >= 4) {
+        bool legacy = argc > 4 && std::string(argv[4]) == "--legacy-pak";
         size_t n = 0;
-        auto pak = buildProjectPak(pathFromUtf8(argv[2]), true, &n);
+        auto pak = buildProjectPak(pathFromUtf8(argv[2]), true, &n, nullptr, {}, {}, legacy);
         if (!pak) { std::fprintf(stderr, "error: %s\n", pak.error().c_str()); return 2; }
         if (!writeFileBytes(pathFromUtf8(argv[3]), *pak)) return 2;
-        std::printf("wrote %s (%zu files, %zu bytes)\n", argv[3], n, pak->size());
+        std::printf("wrote %s (%zu files, %zu bytes, format v%d)\n", argv[3], n, pak->size(), legacy ? 1 : 2);
         return 0;
     }
     PackageOptions opt;
@@ -122,6 +131,8 @@ int main(int argc, char** argv) {
         else if (a == "--modules") opt.moduleDir = next();
         else if (a == "--sidecar") opt.embedPak = false;
         else if (a == "--no-compress") opt.compress = false;
+        else if (a == "--legacy-pak") opt.legacyPak = true;
+        else if (a == "--no-incremental") opt.incremental = false;
         else if (a == "--no-icon") opt.applyIcon = false;
         else if (a == "--gui") opt.subsystem = 2;
         else if (a == "--console") opt.subsystem = 3;
@@ -134,9 +145,11 @@ int main(int argc, char** argv) {
         std::fprintf(stderr, "fledgepack: error: %s\n", r.error().c_str());
         return 2;
     }
-    std::printf("fledgepack: OK -> %s (%zu files, pak %llu bytes, modules %zu, icon %s, subsystem %s, scripts %s)\n",
-                narrow(r->executable.wstring()).c_str(), r->fileCount, static_cast<unsigned long long>(r->pakBytes),
+    std::printf("fledgepack: OK -> %s (%zu files, pak %llu bytes v%d, modules %zu, icon %s, subsystem %s, scripts %s",
+                narrow(r->executable.wstring()).c_str(), r->fileCount, static_cast<unsigned long long>(r->pakBytes), r->pakFormat,
                 r->copiedModules.size(), r->iconApplied ? "yes" : "no", r->subsystem == 2 ? "gui" : "console",
                 r->scriptModule.empty() ? "none" : r->scriptModule.c_str());
+    if (r->pakFormat == 2) std::printf(", chunks %zu (%zu reused)", r->chunksWritten, r->chunksReused);
+    std::printf(")\n");
     return 0;
 }

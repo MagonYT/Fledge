@@ -3,9 +3,11 @@
 #include <cstring>
 #include <format>
 #include <fstream>
+#include <unordered_map>
 
 #include "fledge/assets/asset_registry.h"
 #include "fledge/assets/cooked.h"
+#include "fledge/assets/fpack.h"
 #include "fledge/assets/pak.h"
 #include "fledge/assets/lod.h"
 #include "fledge/importers/importers.h"
@@ -59,23 +61,35 @@ static std::string sceneNeedsAdvancedPlayer(const fs::path& contentDir) {
     return {};
 }
 
-Result<Bytes> buildProjectPak(const fs::path& projectFile, bool compress, size_t* fileCount, uint64_t* contentBytes,
-                              const std::function<void(size_t, size_t, const std::string&)>& onFile,
-                              const std::function<void(size_t, size_t, const std::string&)>& onCompress) {
+// Everything that goes into a package: the entries plus counters.
+struct CollectedEntries {
+    std::map<std::string, Bytes> entries;  // pak path -> raw bytes
+    size_t fileCount = 0;
+    uint64_t contentBytes = 0;
+};
+
+// Collects the exact set of files that goes into a package (cooked outputs,
+// passthrough content, world chunks, registry, project manifest). Shared by
+// the in-memory v1/v2 builds and the streaming incremental v2 build.
+static Result<CollectedEntries> collectProjectEntries(const fs::path& projectFile,
+                                                      const std::function<void(size_t, size_t, const std::string&)>& onFile) {
     auto project = Project::load(projectFile);
-    if (!project) return Result<Bytes>::failure(project.error());
+    if (!project) return Result<CollectedEntries>::failure(project.error());
     // 1) incremental cook into <project>/Intermediate/Cooked — used textures only, plus the environment HDR (lighting).
     CookOptions cookOpt;
     cookOpt.usedTexturesOnly = true;
     auto cook = cookProject(*project, cookOpt, [&](const std::string& msg) {
         if (onFile) onFile(0, 1, msg);
     });
-    if (!cook) return Result<Bytes>::failure("cook failed: " + cook.error());
+    if (!cook) return Result<CollectedEntries>::failure("cook failed: " + cook.error());
     auto usedTex = collectUsedTextures(*project);
     DirectoryProvider content(project->contentDir());
     DirectoryProvider cooked(project->cookDir());
-    PakWriter writer;
-    writer.setCompression(compress);
+    // Entries are collected first, then emitted by emitPackage() below: the
+    // default is the v2 content-addressed chunked container ("CAGEPAK2");
+    // --legacy-pak selects the v1 monolithic layout.
+    std::map<std::string, Bytes> entries;
+    auto addEntry = [&](std::string path, Bytes data) { entries[std::move(path)] = std::move(data); };
     uint64_t bytes = 0;
     size_t count = 0;
     size_t omittedTextures = 0;
@@ -101,15 +115,15 @@ Result<Bytes> buildProjectPak(const fs::path& projectFile, bool compress, size_t
         if (!target.empty() && target != rel) {  // ship the cooked file instead of the source
             data = cooked.read(target);
             name = target;
-            if (!data) return Result<Bytes>::failure("cooked output missing for " + rel);
+            if (!data) return Result<CollectedEntries>::failure("cooked output missing for " + rel);
         } else {
             data = content.read(rel);
-            if (!data) return Result<Bytes>::failure("cannot read content file " + rel);
+            if (!data) return Result<CollectedEntries>::failure("cannot read content file " + rel);
             // Safety net: never ship anything that looks like a credential.
             if (isTextAsset(rel)) {
                 std::string_view text(reinterpret_cast<const char*>(data->data()), data->size());
                 if (redact(text) != text)
-                    return Result<Bytes>::failure(std::format(
+                    return Result<CollectedEntries>::failure(std::format(
                         "content file '{}' contains something that looks like an API key or token; refusing to package it", rel));
             }
         }
@@ -122,12 +136,12 @@ Result<Bytes> buildProjectPak(const fs::path& projectFile, bool compress, size_t
                     if (ent.contains("components") && ent["components"].contains("WorldPartition")) partitioned = true;
             if (partitioned) {
                 auto cooked = world::cookWorld(sj);
-                if (!cooked) return Result<Bytes>::failure(rel + ": " + cooked.error());
+                if (!cooked) return Result<CollectedEntries>::failure(rel + ": " + cooked.error());
                 std::string dir = world::worldDirFor(rel);
                 for (auto& [file, text] : cooked->chunks) {
                     bytes += text.size();
                     ++count;
-                    writer.add(dir + "/" + file, Bytes(text.begin(), text.end()));
+                    addEntry(dir + "/" + file, Bytes(text.begin(), text.end()));
                 }
                 // HLOD: one merged, simplified proxy mesh per chunk (drawn for unloaded chunks in the distance)
                 {
@@ -168,14 +182,14 @@ Result<Bytes> buildProjectPak(const fs::path& projectFile, bool compress, size_t
                         if (proxy.empty()) continue;
                         Bytes hb = writeCookedMesh(proxy);
                         bytes += hb.size();
-                        writer.add(dir + "/" + world::ChunkCoord{ch.value("x", 0), ch.value("z", 0)}.name() + ".hlod", std::move(hb));
+                        addEntry(dir + "/" + world::ChunkCoord{ch.value("x", 0), ch.value("z", 0)}.name() + ".hlod", std::move(hb));
                         colour = colour / static_cast<float>(parts.size());
                         ch["hlod"] = true;
                         ch["hlodColor"] = {colour.x, colour.y, colour.z};
                     }
                 }
                 std::string idx = cooked->index.dump();
-                writer.add(dir + "/index.json", Bytes(idx.begin(), idx.end()));
+                addEntry(dir + "/index.json", Bytes(idx.begin(), idx.end()));
                 std::string s = cooked->scene.dump();
                 *data = Bytes(s.begin(), s.end());
                 FLEDGE_LOG_INFO("package", "Open world {}: {} chunks", rel, cooked->chunks.size());
@@ -183,10 +197,10 @@ Result<Bytes> buildProjectPak(const fs::path& projectFile, bool compress, size_t
         }
         bytes += data->size();
         ++count;
-        writer.add(name, std::move(*data));
+        addEntry(name, std::move(*data));
     }
     if (!content.exists(project->startupScene))
-        return Result<Bytes>::failure("startup scene '" + project->startupScene + "' not found in Content/");
+        return Result<CollectedEntries>::failure("startup scene '" + project->startupScene + "' not found in Content/");
     // Registry index rebuilt in memory from the .meta files (nothing is written to the project).
     Vfs vfs;
     vfs.mount("content", std::make_shared<DirectoryProvider>(project->contentDir()));
@@ -200,14 +214,144 @@ Result<Bytes> buildProjectPak(const fs::path& projectFile, bool compress, size_t
         if (!usedTex.contains(rec.path) && !usedTex.contains(src)) registry.remove(rec.guid);
     }
     std::string reg = registry.toJson().dump(2);
-    writer.add(AssetRegistry::kFileName, Bytes(reg.begin(), reg.end()));
+    addEntry(AssetRegistry::kFileName, Bytes(reg.begin(), reg.end()));
     std::string manifest = project->toJson().dump(2);
-    writer.add(Project::kPakManifestName, Bytes(manifest.begin(), manifest.end()));
-    if (fileCount) *fileCount = count;
-    if (contentBytes) *contentBytes = bytes;
+    addEntry(Project::kPakManifestName, Bytes(manifest.begin(), manifest.end()));
     FLEDGE_LOG_INFO("package", "Pak '{}': {} files, {} unused textures left out, environment '{}'", project->name, count, omittedTextures,
                     project->render.environment.empty() ? "(procedural sky)" : project->render.environment);
+    CollectedEntries out;
+    out.entries = std::move(entries);
+    out.fileCount = count;
+    out.contentBytes = bytes;
+    return out;
+}
+
+Result<Bytes> buildProjectPak(const fs::path& projectFile, bool compress, size_t* fileCount, uint64_t* contentBytes,
+                              const std::function<void(size_t, size_t, const std::string&)>& onFile,
+                              const std::function<void(size_t, size_t, const std::string&)>& onCompress, bool legacyPak) {
+    auto collected = collectProjectEntries(projectFile, onFile);
+    if (!collected) return Result<Bytes>::failure(collected.error());
+    if (fileCount) *fileCount = collected->fileCount;
+    if (contentBytes) *contentBytes = collected->contentBytes;
+    if (legacyPak) {
+        PakWriter writer;
+        writer.setCompression(compress);
+        for (auto& [path, data] : collected->entries) writer.add(path, std::move(data));
+        return writer.build(onCompress);
+    }
+    FpackWriter writer;
+    for (auto& [path, data] : collected->entries) writer.add(path, std::move(data));
     return writer.build(onCompress);
+}
+
+// Seeds a v2 writer with the chunk payloads of a previous archive (file or
+// exe with an appended pak) so identical chunks keep their stored bytes
+// instead of being re-compressed. Returns the number of chunks made
+// available for reuse (0 when previousFile is empty/unreadable).
+static size_t seedIncrementalReuse(FpackWriter& writer, const fs::path& previousFile) {
+    if (previousFile.empty()) return 0;
+    auto prevIdx = readFpackIndex(previousFile);
+    if (!prevIdx) return 0;
+    // Chunk offsets in the index are relative to the pak start; for an
+    // appended pak the payloads live after the exe image, so locate the pak
+    // base first.
+    uint64_t base = 0;
+    {
+        std::error_code ec;
+        uint64_t fileSize = fs::file_size(osPath(previousFile), ec);
+        if (ec) return 0;
+        if (fileSize >= 32) {
+            std::ifstream tf(osPath(previousFile), std::ios::binary);
+            tf.seekg(static_cast<std::streamoff>(fileSize - 32));
+            uint8_t buf[32];
+            if (tf.read(reinterpret_cast<char*>(buf), 32) && std::memcmp(buf, "CAGEFTR1", 8) == 0) {
+                uint64_t off = 0, size = 0;
+                for (int i = 0; i < 8; ++i) off |= uint64_t(buf[8 + i]) << (8 * i);
+                for (int i = 0; i < 8; ++i) size |= uint64_t(buf[16 + i]) << (8 * i);
+                uint32_t fver = uint32_t(buf[24]) | (uint32_t(buf[25]) << 8);
+                if (fver == kFpackVersion && off + size + 32 <= fileSize) base = off;
+            }
+        }
+    }
+    std::ifstream in(osPath(previousFile), std::ios::binary);
+    if (!in) return 0;
+    std::unordered_map<uint64_t, Bytes> payloads;
+    for (const FpackChunk& c : prevIdx->chunks) {
+        Bytes blob(c.storedSize);
+        in.seekg(static_cast<std::streamoff>(base + c.offset));
+        if (!in.read(reinterpret_cast<char*>(blob.data()), static_cast<std::streamsize>(blob.size()))) {
+            payloads.clear();
+            break;
+        }
+        payloads.emplace(c.hash, std::move(blob));
+    }
+    if (payloads.empty()) return 0;
+    writer.setChunks(prevIdx->chunks, payloads);
+    FLEDGE_LOG_INFO("package", "Incremental: {} chunks available for reuse from {}", prevIdx->chunks.size(),
+                    narrow(previousFile.filename().wstring()));
+    return prevIdx->chunks.size();
+}
+
+// Streams the v2 image to file: header + chunks go to "<file>.tmp" first, the
+// index (written last) is staged in "<file>.new" which is atomically renamed
+// over the target. previousFile, when readable, seeds incremental chunk
+// reuse: unchanged chunks are not re-compressed or re-stored.
+Result<FpackIndex> buildProjectFpackFile(const fs::path& projectFile, const fs::path& file, const fs::path& previousFile,
+                                         size_t* fileCount, uint64_t* contentBytes,
+                                         const std::function<void(size_t, size_t, const std::string&)>& onFile,
+                                         const std::function<void(size_t, size_t, const std::string&)>& onChunk) {
+    auto collected = collectProjectEntries(projectFile, onFile);
+    if (!collected) return Result<FpackIndex>::failure(collected.error());
+    if (fileCount) *fileCount = collected->fileCount;
+    if (contentBytes) *contentBytes = collected->contentBytes;
+
+    FpackWriter writer;
+    for (auto& [path, data] : collected->entries) writer.add(path, std::move(data));
+    collected->entries.clear();
+    seedIncrementalReuse(writer, previousFile);
+    std::error_code ec;
+    if (file.has_parent_path()) fs::create_directories(file.parent_path(), ec);
+    const fs::path tmp = file.wstring() + L".tmp";
+    const fs::path fin = file.wstring() + L".new";
+    FpackIndex idx;
+    {
+        std::ofstream out(osPath(tmp), std::ios::binary | std::ios::trunc);
+        if (!out) return Result<FpackIndex>::failure("cannot open " + narrow(tmp.wstring()));
+        auto r = writer.buildIndex(out, onChunk);
+        if (!r) return Result<FpackIndex>::failure(r.error());
+        idx = std::move(*r);
+    }
+    // Build the real header now that the index offset/size are known. The
+    // staged file is placeholder header + chunk payloads, so its size is the
+    // index offset; the real header overwrites the placeholder 1:1.
+    uint64_t chunkBytes = fs::file_size(osPath(tmp), ec);
+    if (ec) return Result<FpackIndex>::failure("cannot measure staged pak");
+    Bytes indexBlob = serializeFpackIndex(idx);
+    Bytes header;
+    header.insert(header.end(), kFpackMagic, kFpackMagic + 8);
+    for (uint32_t v : {kFpackVersion, 0u, kFpackChunkShift, 0u})  // version, flags, chunkShift, reserved
+        for (int i = 0; i < 4; ++i) header.push_back(static_cast<uint8_t>(v >> (8 * i)));
+    for (uint64_t v : {static_cast<uint64_t>(idx.entries.size()), static_cast<uint64_t>(idx.chunks.size()), chunkBytes,
+                       static_cast<uint64_t>(indexBlob.size())})
+        for (int i = 0; i < 8; ++i) header.push_back(static_cast<uint8_t>(v >> (8 * i)));
+    if (header.size() != kFpackHeaderSize) return Result<FpackIndex>::failure("internal header size mismatch");
+    {
+        std::error_code ec2;
+        fs::copy_file(tmp, fin, fs::copy_options::overwrite_existing, ec2);
+        if (ec2) return Result<FpackIndex>::failure("cannot stage pak: " + ec2.message());
+        std::ofstream out(osPath(fin), std::ios::binary | std::ios::in);
+        if (!out) return Result<FpackIndex>::failure("cannot open " + narrow(fin.wstring()));
+        out.write(reinterpret_cast<const char*>(header.data()), static_cast<std::streamsize>(header.size()));
+        out.seekp(0, std::ios::end);
+        out.write(reinterpret_cast<const char*>(indexBlob.data()), static_cast<std::streamsize>(indexBlob.size()));
+        if (!out.good()) return Result<FpackIndex>::failure("cannot finalize pak");
+    }
+    fs::remove(file, ec);  // Windows rename cannot overwrite
+    ec.clear();
+    fs::rename(fin, file, ec);
+    if (ec) return Result<FpackIndex>::failure("cannot replace " + narrow(file.wstring()) + ": " + ec.message());
+    fs::remove(tmp, ec);
+    return idx;
 }
 
 Result<PackageResult> packageProject(const PackageOptions& opt, const ProgressFn& progress) {
@@ -246,24 +390,54 @@ Result<PackageResult> packageProject(const PackageOptions& opt, const ProgressFn
     res.outputDir = opt.outputDir.empty() ? project->buildDir() / project->gameName : opt.outputDir;
 
     say(std::format("Packaging '{}' -> {}", project->gameName, narrow(res.outputDir.wstring())), 0.02f);
-    auto pak = buildProjectPak(
-        opt.projectFile, opt.compress, &res.fileCount, &res.contentBytes,
-        [&](size_t index, size_t total, const std::string& rel) {
-            if (index != total && index % 32 != 0) return;
-            float fraction = total ? 0.05f + 0.23f * static_cast<float>(index) / static_cast<float>(total) : 0.15f;
-            say(std::format("Packing content {}/{}  {}", index, total, rel), fraction);
-        },
-        [&](size_t done, size_t total, const std::string& path) {
-            float fraction = total ? 0.30f + 0.32f * static_cast<float>(done) / static_cast<float>(total) : 0.4f;
-            say(std::format("Compressing pak {}/{}  {}", done, total, path), fraction);
-        });
-    if (!pak) return Result<PackageResult>::failure(pak.error());
-    res.pakBytes = pak->size();
-    say(std::format("Built pak: {} files, {} bytes content -> {} bytes packed", res.fileCount, res.contentBytes, res.pakBytes), 0.64f);
+    res.pakFormat = opt.legacyPak ? 1 : 2;
+    const auto onFile = [&](size_t index, size_t total, const std::string& rel) {
+        if (index != total && index % 32 != 0) return;
+        float fraction = total ? 0.05f + 0.23f * static_cast<float>(index) / static_cast<float>(total) : 0.15f;
+        say(std::format("Packing content {}/{}  {}", index, total, rel), fraction);
+    };
+    const auto onChunk = [&](size_t done, size_t total, const std::string& path) {
+        float fraction = total ? 0.30f + 0.32f * static_cast<float>(done) / static_cast<float>(total) : 0.4f;
+        say(std::format("Compressing pak {}/{}  {}", done, total, path), fraction);
+    };
+    // Legacy path keeps the historical in-memory image; v2 (embedded or
+    // sidecar) seeds incremental chunk reuse from the previous package before
+    // building. The sidecar is streamed to disk below; the embedded pak is
+    // built in memory here (its size is needed at append).
+    std::optional<Bytes> pak;
+    std::optional<FpackIndex> sidecarIndex;
+    if (opt.legacyPak) {
+        auto built = buildProjectPak(opt.projectFile, opt.compress, &res.fileCount, &res.contentBytes, onFile, onChunk, true);
+        if (!built) return Result<PackageResult>::failure(built.error());
+        pak = std::move(*built);
+        res.pakBytes = pak->size();
+    } else if (opt.embedPak) {
+        // v2 embedded: collect, seed reuse from the previous embedded pak,
+        // build the image in memory.
+        auto collected = collectProjectEntries(opt.projectFile, onFile);
+        if (!collected) return Result<PackageResult>::failure(collected.error());
+        res.fileCount = collected->fileCount;
+        res.contentBytes = collected->contentBytes;
+        FpackWriter writer;
+        for (auto& [path, data] : collected->entries) writer.add(path, std::move(data));
+        collected->entries.clear();
+        if (opt.incremental) {
+            fs::path prevPath = res.outputDir / (widen(project->gameName) + L".exe");
+            if (fs::is_regular_file(prevPath, ec)) seedIncrementalReuse(writer, prevPath);
+        }
+        auto built = writer.build(onChunk);
+        if (!built) return Result<PackageResult>::failure(built.error());
+        pak = std::move(*built);
+        res.pakBytes = pak->size();
+    }
+    if (pak) say(std::format("Built pak v{}: {} files, {} bytes content -> {} bytes packed", res.pakFormat, res.fileCount,
+                             res.contentBytes, res.pakBytes),
+                 0.64f);
 
     fs::create_directories(res.outputDir, ec);
     if (ec) return Result<PackageResult>::failure("cannot create output directory");
     res.executable = res.outputDir / (widen(project->gameName) + L".exe");
+
     fs::remove(res.executable, ec);  // libstdc++ on Windows fails overwrite_existing copies of existing files
     fs::copy_file(runtime, res.executable, fs::copy_options::overwrite_existing, ec);
     if (ec) return Result<PackageResult>::failure("cannot copy runtime: " + ec.message());
@@ -311,15 +485,42 @@ Result<PackageResult> packageProject(const PackageOptions& opt, const ProgressFn
         if (ec) return Result<PackageResult>::failure("cannot measure the copied runtime");
         if (!writeBlob(res.executable, std::ios::app, *pak, 0.69f, 0.82f, "Writing the game executable"))
             return Result<PackageResult>::failure("cannot write game exe");
-        Bytes footer = makePakFooter(offset, pak->size());
+        Bytes footer = opt.legacyPak ? makePakFooter(offset, pak->size()) : makeFpackFooter(offset, pak->size());
         if (!writeBlob(res.executable, std::ios::app, footer, 0.82f, 0.83f, "Writing the pak footer"))
             return Result<PackageResult>::failure("cannot write game exe footer");
-        say(std::format("Embedded pak at offset {} in {}", offset, narrow(res.executable.filename().wstring())), 0.83f);
+        say(std::format("Embedded pak v{} at offset {} in {}", res.pakFormat, offset, narrow(res.executable.filename().wstring())),
+            0.83f);
     } else {
         fs::path side = res.outputDir / (widen(project->gameName) + L".fpak");
         say("Writing " + narrow(side.filename().wstring()), 0.69f);
-        if (!writeBlob(side, std::ios::trunc, *pak, 0.69f, 0.83f, "Writing sidecar pak"))
-            return Result<PackageResult>::failure("cannot write sidecar pak");
+        if (opt.legacyPak) {
+            if (!writeBlob(side, std::ios::trunc, *pak, 0.69f, 0.83f, "Writing sidecar pak"))
+                return Result<PackageResult>::failure("cannot write sidecar pak");
+        } else {
+            // Streamed + atomic: header/chunks go to a temp file, the index
+            // (written last) is staged and renamed over the target. The
+            // previous sidecar (still on disk until the rename) seeds reuse.
+            fs::path prevSide = opt.incremental && fs::is_regular_file(side, ec) ? side : fs::path();
+            auto built = buildProjectFpackFile(opt.projectFile, side, prevSide, &res.fileCount, &res.contentBytes, onFile, onChunk);
+            if (!built) return Result<PackageResult>::failure(built.error());
+            sidecarIndex = std::move(*built);
+            res.pakBytes = fs::file_size(side, ec);
+            if (ec) return Result<PackageResult>::failure("cannot measure sidecar pak");
+            res.chunksWritten = sidecarIndex->chunks.size();
+            // Report how many stored chunks carry content the previous archive
+            // already had (these are the ones incremental reuse avoided
+            // re-compressing).
+            if (!prevSide.empty()) {
+                std::unordered_map<uint64_t, bool> fresh;
+                for (const FpackChunk& c : sidecarIndex->chunks) fresh[c.hash] = true;
+                if (auto prevIdx = readFpackIndex(prevSide))
+                    for (const FpackChunk& c : prevIdx->chunks)
+                        if (fresh.contains(c.hash)) ++res.chunksReused;
+            }
+            say(std::format("Built pak v2: {} files, {} bytes content -> {} bytes packed ({} chunks, {} reused)", res.fileCount,
+                            res.contentBytes, res.pakBytes, res.chunksWritten, res.chunksReused),
+                0.83f);
+        }
         say("Wrote sidecar " + narrow(side.filename().wstring()), 0.83f);
     }
 

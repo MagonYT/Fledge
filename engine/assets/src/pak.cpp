@@ -22,8 +22,9 @@ struct Cursor {
     template <typename T>
     T get() {
         if (pos + sizeof(T) > d.size()) { ok = false; return T{}; }
+        // Widening each byte to T first keeps the <<56 case defined for u64.
         T v = 0;
-        for (size_t i = 0; i < sizeof(T); ++i) v |= static_cast<T>(static_cast<T>(d[pos + i]) << (8 * i));
+        for (size_t i = 0; i < sizeof(T); ++i) v |= static_cast<T>(d[pos + i]) << (8 * i);
         pos += sizeof(T);
         return v;
     }
